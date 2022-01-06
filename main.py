@@ -3,31 +3,31 @@ from itertools import cycle
 import random
 
 class Suits(Enum):
-    Spades = 0
-    Hearts = 1
-    Clubs = 2
+    Spades   = 0
+    Hearts   = 1
+    Clubs    = 2
     Diamonds = 3
 
 class Ranks(Enum):
-    Ace = 1
-    Two = 2
+    Ace   = 1
+    Two   = 2
     Three = 3
-    Four = 4
-    Five = 5
-    Six = 6
+    Four  = 4
+    Five  = 5
+    Six   = 6
     Seven = 7
     Eight = 8
-    Nine = 9
-    Ten = 10
-    Jack = 11
+    Nine  = 9
+    Ten   = 10
+    Jack  = 11
     Queen = 12
-    King = 13
+    King  = 13
 
 class Actions(Enum):
     Check = 0
-    Call = 1
+    Call  = 1
     Raise = 2
-    Fold = 3
+    Fold  = 3
 
 
 class Card:
