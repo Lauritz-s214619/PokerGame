@@ -16,7 +16,7 @@ class DQN(nn.Module):
     def __init__(self,hand,wallet,bet,community_cards):
         
         #Basic totalforbundet netværk (Hvad)
-        self.fc1 = nn.Linear(in_features=hand * community_cards - \
+        self.fc1 = nn.Linear(in_features=hand, community_cards, \
                              bet + wallet, out_features=24)
         self.fc2 = nn.Linear(in_features=24, out_features=32)
         self.out = nn.Linear(in_features=32, out_features=4)
@@ -83,7 +83,14 @@ class Agent():
         rate = strategy.get_exploration_rate(self.current_step)
         self.current_step += 1
 
-
+        if rate > random.random():
+            return random.randrange(self.num_actions) #explore
+        else:
+            #no_grad da vi ikke vil opdatere gradienten til NN
+            with torch.no_grad():
+                return policy_net(state.argmax(dim=1).item() #exploit
+                              
+                        
 
 
 
