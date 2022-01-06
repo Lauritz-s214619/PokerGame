@@ -38,10 +38,15 @@ class Card:
     
     def __str__(self):
         return f'{self.rank.name} of {self.suit.name}'
+    
+    def __eq__(self, other):
+        if not isinstance(other, Card):
+            return NotImplemented
+        return self.suit == other.suit and self.rank == other.rank
 
 class Deck:
     def __init__(self, shuffle_cards = True):
-        self.cards = [Card(Suits(x), Ranks(y)) for y in range(1,14) for x in range(4)]
+        self.cards = [Card(Suits(x), Ranks(y)) for y in range(2,15) for x in range(4)]
         if shuffle_cards:
             random.shuffle(self.cards)
     
@@ -60,8 +65,9 @@ class Player:
         self.wallet = wallet
         self.bet = 0
         self.in_game = True
+        self.is_all_in = False
     
-    def get_cards(self):
+    def show_cards(self):
         return [str(card) for card in self.hand.cards]
 
 class Round:
@@ -78,7 +84,8 @@ class Round:
             actions.append(Actions.Raise)
         elif self.active_player.bet < self.bet_to_call:
             actions.append(Actions.Call)
-            actions.append(Actions.Raise)
+            if (self.active_player.wallet + self.active_player.bet) > self.bet_to_call:
+                actions.append(Actions.Raise)
             actions.append(Actions.Fold)
         return actions
 
@@ -87,11 +94,11 @@ class Game:
     def __init__(self, deck, players):
         self.deck = deck
         self.players = players
+        self.active_players = players
         self.small_blind = 5
         self.big_blind = 10
         self.community_cards = []
         self.is_done = False
-        self.num_active_players = len(players)
     
     def deal_cards(self, num = 2):
         for player in self.players:
@@ -106,58 +113,83 @@ class Game:
     
     def new_round(self):
         round = Round(self.players)
-        active_players = [player for player in self.players if player.in_game]
-        cycle_active_players = cycle(active_players)
+        #active_players = [player for player in self.players if player.in_game and not player.is_all_in]
+        cycle_active_players = cycle(self.active_players)
+        num_turns = 0
         while(not round.is_done):
-            if len(self.num_active_players) == 1:
+            if len([player for player in self.active_players if not player.is_all_in]) <= 1:
                 round.is_done = True
                 self.is_done = True
-                break
+                return
 
             player = next(cycle_active_players)
             if not player.in_game:
                 continue
+            elif player.is_all_in:
+                print(f'\n{player.name} - {player.show_cards()} - Wallet: {player.wallet}')
+                print(f'You\'re all in!')
+                continue
             else:
                 round.active_player = player
                 actions = round.get_actions()
-                print(f'\n{player.name} - {player.get_cards()} - Wallet: {player.wallet}')
+                print(f'\n{player.name} - {player.show_cards()} - Wallet: {player.wallet}')
                 print(f'Your current bet: {player.bet}')
                 print(f'Bet to match: {round.bet_to_call}\n')
                 for action in actions:
                     print(f'{action.value}. {action.name}')
                 
                 action = -1
-                while(action not in [action.value for action in actions]):
+                action_completed = False
+                while(action not in [action.value for action in actions] and not action_completed):
                     try:
                         action = int(input(f'Choice: '))
                     except ValueError:
                         print("Please enter an integer")
 
-                    if action == 1:
-                        if player.wallet >= round.bet_to_call:
-                            diff = round.bet_to_call - player.bet
+                    if action == Actions.Call.value:
+                        diff = round.bet_to_call - player.bet
+                        if player.wallet >= diff:
                             player.wallet -= diff
                             player.bet += diff
-                    elif action == 2:
+                        else:
+                            player.bet += player.wallet
+                            player.wallet = 0
+                            player.is_all_in = True
+                            print("All in!")
+                        action_completed = True
+                    elif action == Actions.Raise.value:
                         raise_completed = False
                         while(not raise_completed):
                             bet = int(input(f'Amount to bet (min {self.big_blind}): '))
                             if bet > round.bet_to_call and bet >= self.big_blind and bet <= player.wallet:
                                 player.wallet -= bet
                                 player.bet += bet
-                                round.bet_to_call += bet
+                                round.bet_to_call = player.bet
                                 raise_completed = True
-                    elif action == 3:
+                                action_completed = True
+                                if player.wallet == 0:
+                                    player.is_all_in = True
+                                    print("All in!")
+                            else:
+                                print(f'Not a valid bet. Your wallet: {player.wallet}')
+                    elif action == Actions.Fold.value:
                         player.in_game = False
-            
+                        self.active_players.remove(player)
+                        action_completed = True
+
+                num_turns += 1
                 #Check if round is done
-                bets = [player.bet for player in self.players if player.in_game]                      
-                if bets.count(bets[0]) == len(bets):
+                bets = [player.bet for player in self.players if player.in_game]
+                if bets.count(bets[0]) == len(bets) and num_turns >= len(self.active_players):
                     round.is_done = True
 
         round.pot = sum(bets)
-        for player in active_players:
+        for player in self.active_players:
             player.bet = 0
+    
+    def get_winner(self):
+        for player in self.active_players:
+            player.best_hand()
 
         
 
@@ -167,25 +199,48 @@ game1 = Game(Deck(), [player1, player2])
 game1.deal_cards(2)
 print(f'''
 =============================
-{player1.name}: {player1.get_cards()}
-{player2.name}: {player2.get_cards()}
+{player1.name}: {player1.show_cards()}
+{player2.name}: {player2.show_cards()}
 =============================
 ''')
 
 print("Round 1:")
-game1.new_round()
+#game1.new_round()
 
 print("\nRound 2 - Flop:")
 game1.show_card(3)
 
-game1.new_round()
+#game1.new_round()
 
 print("\nRound 3 - Turn:")
 game1.show_card()
 
-game1.new_round()
+#game1.new_round()
 
 print("\nRound 4 - River:")
 game1.show_card()
 
-game1.new_round()
+#game1.new_round()
+
+#game1.get_winner()
+print("\n")
+
+all_cards = player1.hand.cards + game1.community_cards
+
+
+ranks = [card.rank.value for card in all_cards]
+suits = [card.rank.value for card in all_cards]
+higest_card = max(ranks)
+
+pairs = [rank for rank in ranks if ranks.count(rank)==2]
+if pairs:
+    higest_pair = max(pairs)
+
+
+print(pairs)
+print(max([rank for rank in ranks if ranks.count(rank)>1]))
+print(len([card for card in all_cards if card.suit == Suits.Spades]))
+print(len([card for card in all_cards if card.suit == Suits.Hearts]))
+print(len([card for card in all_cards if card.suit == Suits.Clubs]))
+print(len([card for card in all_cards if card.suit == Suits.Diamonds]))
+#print(card for card in all_cards if card == Card(Suits.Hearts, Ranks.Ace))
