@@ -1,4 +1,5 @@
 from enum import Enum
+from itertools import cycle
 import random
 
 class Suits(Enum):
@@ -72,12 +73,12 @@ class Round:
     def get_actions(self):
         actions = []
         if self.active_player.bet == self.bet_to_call:
-            actions.append(Actions(0))
-            actions.append(Actions(2))
+            actions.append(Actions.Check)
+            actions.append(Actions.Raise)
         elif self.active_player.bet < self.bet_to_call:
-            actions.append(Actions(1))
-            actions.append(Actions(2))
-            actions.append(Actions(3))
+            actions.append(Actions.Call)
+            actions.append(Actions.Raise)
+            actions.append(Actions.Fold)
         return actions
 
 
@@ -88,25 +89,34 @@ class Game:
         self.small_blind = 5
         self.big_blind = 10
         self.community_cards = []
+        self.is_done = False
+        self.num_active_players = len(players)
     
-    def deal_cards(self):
+    def deal_cards(self, num = 2):
         for player in self.players:
-            player.hand.cards.append(self.deck.deal_card())
-            player.hand.cards.append(self.deck.deal_card())
+            for i in range(num):
+                player.hand.cards.append(self.deck.deal_card())            
     
-    def show_card(self):
-        card = self.deck.deal_card()
-        self.community_cards.append(card)
-        print(card)
+    def show_card(self, num = 1):
+        for i in range(num):
+            card = self.deck.deal_card()
+            self.community_cards.append(card)
+            print(card)
     
     def new_round(self):
         round = Round(self.players)
+        active_players = [player for player in self.players if player.in_game]
+        cycle_active_players = cycle(active_players)
         while(not round.is_done):
-            active_players = [player for player in self.players if player.in_game]
-            if len(active_players)==1:
+            if len(self.num_active_players) == 1:
                 round.is_done = True
+                self.is_done = True
+                break
 
-            for player in active_players:
+            player = next(cycle_active_players)
+            if not player.in_game:
+                continue
+            else:
                 round.active_player = player
                 actions = round.get_actions()
                 print(f'\n{player.name} - {player.get_cards()} - Wallet: {player.wallet}')
@@ -130,29 +140,30 @@ class Game:
                     elif action == 2:
                         raise_completed = False
                         while(not raise_completed):
-                            bet = int(input("Amount to bet: "))
+                            bet = int(input(f'Amount to bet (min {self.big_blind}): '))
                             if bet > round.bet_to_call and bet >= self.big_blind and bet <= player.wallet:
                                 player.wallet -= bet
                                 player.bet += bet
                                 round.bet_to_call += bet
                                 raise_completed = True
                     elif action == 3:
-                        player.in_game = False                      
+                        player.in_game = False
             
-            #Check if round is done
-            bets = [player.bet for player in active_players]
-            if bets.count(bets[0]) == len(bets):
-                round.pot = sum(bets)
-                for player in active_players:
-                    player.bet = 0
-                round.is_done = True
+                #Check if round is done
+                bets = [player.bet for player in self.players if player.in_game]                      
+                if bets.count(bets[0]) == len(bets):
+                    round.is_done = True
+
+        round.pot = sum(bets)
+        for player in active_players:
+            player.bet = 0
 
         
 
 player1 = Player("Bob", Hand(), 100)
 player2 = Player("Alice", Hand(), 100)
 game1 = Game(Deck(), [player1, player2])
-game1.deal_cards()
+game1.deal_cards(2)
 print(f'''
 =============================
 {player1.name}: {player1.get_cards()}
@@ -164,9 +175,7 @@ print("Round 1:")
 game1.new_round()
 
 print("\nRound 2 - Flop:")
-game1.show_card()
-game1.show_card()
-game1.show_card()
+game1.show_card(3)
 
 game1.new_round()
 
