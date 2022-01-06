@@ -9,7 +9,7 @@ class Suits(Enum):
     Diamonds = 3
 
 class Ranks(Enum):
-    Ace   = 1
+
     Two   = 2
     Three = 3
     Four  = 4
@@ -22,6 +22,7 @@ class Ranks(Enum):
     Jack  = 11
     Queen = 12
     King  = 13
+    Ace   = 14
 
 class Actions(Enum):
     Check = 0
