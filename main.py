@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import Enum, unique
 from itertools import cycle
 import random
 
@@ -192,7 +192,6 @@ class Game:
             player.best_hand()
 
         
-
 player1 = Player("Bob", Hand(), 100)
 player2 = Player("Alice", Hand(), 100)
 game1 = Game(Deck(), [player1, player2])
@@ -227,20 +226,95 @@ print("\n")
 
 all_cards = player1.hand.cards + game1.community_cards
 
-
 ranks = [card.rank.value for card in all_cards]
-suits = [card.rank.value for card in all_cards]
+suits = [card.suit.value for card in all_cards]
 higest_card = max(ranks)
 
-pairs = [rank for rank in ranks if ranks.count(rank)==2]
+pairs = list(set([rank for rank in ranks if ranks.count(rank) == 2]))
+
+pair_rank = False
 if pairs:
-    higest_pair = max(pairs)
+    pair_rank = max(pairs)
+    print("Pair!")
+    print(pair_rank)
+
+if len(pairs)>1:
+    pairs.remove(max(pairs))
+    two_pair_rank = [pair_rank, max(pairs)]
+    print("Two pair!")
+    print(two_pair_rank)
+
+threes = [rank for rank in ranks if ranks.count(rank) == 3]
+three_of_a_kind_rank = False
+if threes:
+    three_of_a_kind_rank = max(threes)
+    print("Three of a kind!")
+    print(three_of_a_kind_rank)
+
+straight_count = 1
+last_rank = -1
+unique_ranks = list(set(ranks))
+unique_ranks.sort()
+straight_rank = False
+for rank in unique_ranks:
+    if last_rank + 1 == rank:
+        straight_count += 1
+        if straight_count >= 5:
+            straight_rank = rank
+    else:
+        straight_count = 1
+    last_rank = rank
+if straight_rank:
+    print("Straight!")
+    print(straight_rank)
+
+flush_suit_value = False
+flush_rank = False
+for suit in Suits:
+    if suits.count(suit.value) >= 5:
+        flush_rank = max([a for a in suits if a == suit.value])
+        flush_suit_value = suit.value
+        print("Flush!")
+        print(flush_rank)
+        break #It's only possible to get one flush per hand so we don't have to look further
+
+if three_of_a_kind_rank and pair_rank:
+    full_house_rank = three_of_a_kind_rank
+    print("Full house!")
+    print(full_house_rank)
+
+fours = [rank for rank in ranks if ranks.count(rank) == 4]
+four_of_a_kind_rank = False
+if fours:
+    four_of_a_kind_rank = max(fours)
+    print("Four of a kind!")
+    print(four_of_a_kind_rank)
+
+straight_flush_rank = False
+if flush_rank:
+    unique_flush_suite_ranks = list(set([card.rank.value for card in all_cards if card.suit.value == flush_suit_value]))
+    unique_flush_suite_ranks.sort()
+    straight_flush_count = 1
+    last_rank = -1
+    for rank in unique_flush_suite_ranks:
+        if last_rank + 1 == rank:
+            straight_flush_count += 1
+            if straight_flush_count >= 5:
+                straight_flush_rank = rank
+        else:
+            straight_flush_count = 1
+        last_rank = rank
+
+if straight_flush_rank:
+    print("Straight flush!")
+    print(straight_flush_rank)
+
+royal_straight_flush_rank = False
+if straight_flush_rank == Ranks.Ace.value:
+    royal_straight_flush_rank = straight_flush_rank
+
+if royal_straight_flush_rank:
+    print("Royal straight flush!")
+    print(royal_straight_flush_rank)
 
 
-print(pairs)
-print(max([rank for rank in ranks if ranks.count(rank)>1]))
-print(len([card for card in all_cards if card.suit == Suits.Spades]))
-print(len([card for card in all_cards if card.suit == Suits.Hearts]))
-print(len([card for card in all_cards if card.suit == Suits.Clubs]))
-print(len([card for card in all_cards if card.suit == Suits.Diamonds]))
-#print(card for card in all_cards if card == Card(Suits.Hearts, Ranks.Ace))
