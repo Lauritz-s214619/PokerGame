@@ -9,9 +9,9 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 
-##DQN
+## DQN
 
-#Det neurale netværk som approksimere q-værdier
+# Det neurale netværk som approksimere q-værdier
 class DQN(nn.Module):
     def __init__(self,hand,wallet,bet,community_cards):
         
@@ -31,18 +31,18 @@ class DQN(nn.Module):
         return t
 
 
-##Experience
+## Experience
 
 Experience = namedtuple('Experience',('state','action','next_state','reward'))
 
 class ReplayMemory():
-    #Memory er der vi gemmer experience
+    # Memory er der vi gemmer experience
     def __init__(self, capacity):
         self.capacity = capacity
         self.memory = []
         self.push_count = 0
     
-    #Tilføjer Memory og sletter gammel ved maks kapacitet.
+    # Tilføjer Memory og sletter gammel ved maks kapacitet.
     def push(self,experience):
         if len(self.memory) < self.capacity:
             self.memory.append(experience)
@@ -50,15 +50,15 @@ class ReplayMemory():
             self.memory[self.push_count % self.capacity] = experience
         self.push_count += 1   
     
-    #Vælger tilfældig sample fra memory 
+    # Vælger tilfældig sample fra memory 
     def sample(self,batch_size):
          return random.sample(self.memory, batch_size)
     
-    #Vi tjekker om der er nok memory til at vælge en experience
+    # Vi tjekker om der er nok memory til at vælge en experience
     def can_provide_sample(self, batch_size):
          return len(self.memory) >= batch_size
         
-##Epsilon Greedy Strategy
+## Epsilon Greedy Strategy
 
 class EpsilonGreedyStrategy():
     def __init__(self, start, end, decay):
@@ -70,11 +70,11 @@ class EpsilonGreedyStrategy():
         return self.end + (self.start-self.end) * math.exp(-1. * \
                            current_step * self.decay)
 
-##Reinforcement Learning Agent
+## Reinforcement Learning Agent
 
 class Agent():
-    #Skal have en epsilon Greedy strategy og antal actions
-    def __init__(self,strategy, num_actions):
+    #Skal have en epsilon Greedy strategy og antal actions (og gpu/cpu)
+    def __init__(self,strategy, num_actions, device):
         self.current_step=0
         self.strategy = strategy
         self.num_actions = num_actions
@@ -84,11 +84,12 @@ class Agent():
         self.current_step += 1
 
         if rate > random.random():
-            return random.randrange(self.num_actions) #explore
+            action = random.randrange(self.num_actions)
+            return torch.tensor([action]).to(device)   #  explore
         else:
-            #no_grad da vi ikke vil opdatere gradienten til NN
+            # no_grad da vi ikke vil opdatere gradienten til NN
             with torch.no_grad():
-                return policy_net(state.argmax(dim=1).item() #exploit
+                return policy_net(state.argmax(dim=1).item().to(device) # exploit
                               
                         
 
