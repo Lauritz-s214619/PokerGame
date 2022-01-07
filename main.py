@@ -30,6 +30,24 @@ class Actions(Enum):
     Raise = 2
     Fold  = 3
 
+class PokerHand(Enum):
+    HighestCard = 0
+    Pair  = 1
+    TwoPair = 2
+    ThreeOfAKind  = 3
+    Straight  = 4
+    Flush  = 5
+    FullHouse  = 6
+    FourOfAKind  = 7
+    StraightFlush  = 8
+    RoyalFlush  = 9
+
+class Roles(Enum):
+    Player = 0
+    Button = 1
+    SmallBlind = 2
+    BigBlind = 3
+
 
 class Card:
     def __init__(self, suit, rank):
@@ -62,10 +80,15 @@ class Player:
     def __init__(self, name, hand, wallet):
         self.name = name
         self.hand = hand
+        self.best_hand = {
+            'type':PokerHand.HighestCard,
+            'kickers':[]
+        }
         self.wallet = wallet
         self.bet = 0
         self.in_game = True
         self.is_all_in = False
+        self.role = Roles.Player
     
     def show_cards(self):
         return [str(card) for card in self.hand.cards]
@@ -94,11 +117,25 @@ class Game:
     def __init__(self, deck, players):
         self.deck = deck
         self.players = players
-        self.active_players = players
+        self.active_players = players.copy()
         self.small_blind = 5
         self.big_blind = 10
         self.community_cards = []
         self.is_done = False
+        self.is_pre_flop = True
+        for player in self.players:
+            if player.role == Roles.SmallBlind:
+                if player.wallet >= self.small_blind:
+                    player.wallet -= self.small_blind
+                    player.bet = self.small_blind
+                else:
+                    print("Error, wallet size is to samll for small blind")
+            elif player.role == Roles.BigBlind:
+                if player.wallet >= self.big_blind:
+                    player.wallet -= self.big_blind
+                    player.bet = self.big_blind
+                else:
+                    print("Error, wallet size is to samll for big blind")
     
     def deal_cards(self, num = 2):
         for player in self.players:
@@ -113,11 +150,23 @@ class Game:
     
     def new_round(self):
         round = Round(self.players)
-        #active_players = [player for player in self.players if player.in_game and not player.is_all_in]
-        cycle_active_players = cycle(self.active_players)
+        cycle_active_players = cycle(self.players)
         num_turns = 0
+
+        #Align the iter to one player before the player who starts
+        if self.is_pre_flop:
+            #The person after big blind starts
+            player = next(player for player in cycle_active_players if player.role == Roles.BigBlind)
+            #Add blinds to pot
+            round.pot = self.small_blind + self.big_blind
+            round.bet_to_call = self.big_blind
+        else:
+            #The person after button starts
+            player = next(player for player in cycle_active_players if player.role == Roles.Button)
+        
         while(not round.is_done):
-            if len([player for player in self.active_players if not player.is_all_in]) <= 1:
+            num_active_players = len(self.active_players)
+            if num_active_players <= 1:
                 round.is_done = True
                 self.is_done = True
                 return
@@ -180,141 +229,156 @@ class Game:
                 num_turns += 1
                 #Check if round is done
                 bets = [player.bet for player in self.players if player.in_game]
-                if bets.count(bets[0]) == len(bets) and num_turns >= len(self.active_players):
+                if bets.count(bets[0]) == len(bets) and num_turns >= num_active_players:
                     round.is_done = True
 
         round.pot = sum(bets)
-        for player in self.active_players:
+        for player in self.players:
             player.bet = 0
-    
-    def get_winner(self):
-        for player in self.active_players:
-            player.best_hand()
 
-        
+ 
 player1 = Player("Bob", Hand(), 100)
 player2 = Player("Alice", Hand(), 100)
-game1 = Game(Deck(), [player1, player2])
+player3 = Player("Anton", Hand(), 100)
+player4 = Player("Lasse", Hand(), 100)
+
+player1.role = Roles.Button
+player2.role = Roles.SmallBlind
+player3.role = Roles.BigBlind
+game1 = Game(Deck(), [player1, player2,player3, player4])
 game1.deal_cards(2)
-print(f'''
-=============================
-{player1.name}: {player1.show_cards()}
-{player2.name}: {player2.show_cards()}
-=============================
-''')
+# print(f'''
+# =============================
+# {player1.name}: {player1.show_cards()}
+# {player2.name}: {player2.show_cards()}
+# =============================
+# ''')
 
 print("Round 1:")
-#game1.new_round()
+game1.new_round()
 
 print("\nRound 2 - Flop:")
 game1.show_card(3)
-
-#game1.new_round()
+game1.is_pre_flop = False
+game1.new_round()
 
 print("\nRound 3 - Turn:")
 game1.show_card()
 
-#game1.new_round()
+game1.new_round()
 
 print("\nRound 4 - River:")
 game1.show_card()
 
-#game1.new_round()
+game1.new_round()
 
 #game1.get_winner()
-print("\n")
+#print("\n")
 
-all_cards = player1.hand.cards + game1.community_cards
+winning_players = []
+for player in game1.active_players:
+    all_cards = player.hand.cards + game1.community_cards
 
-ranks = [card.rank.value for card in all_cards]
-suits = [card.suit.value for card in all_cards]
-higest_card = max(ranks)
+    ranks = sorted([card.rank.value for card in all_cards], reverse=True)
+    suits = [card.suit.value for card in all_cards]
+    higest_card_rank = max(ranks)
+    player.best_hand['type'] = PokerHand.HighestCard
+    player.best_hand['kickers'] = [higest_card_rank]+[rank for rank in ranks if rank != higest_card_rank][:4]
 
-pairs = list(set([rank for rank in ranks if ranks.count(rank) == 2]))
+    pairs = list(set([rank for rank in ranks if ranks.count(rank) == 2]))
 
-pair_rank = False
-if pairs:
-    pair_rank = max(pairs)
-    print("Pair!")
-    print(pair_rank)
+    pair_rank = False
+    if pairs:
+        pair_rank = max(pairs)
+        player.best_hand['type'] = PokerHand.Pair
+        player.best_hand['kickers'] = [pair_rank]+[rank for rank in ranks if rank != pair_rank][:3]
 
-if len(pairs)>1:
-    pairs.remove(max(pairs))
-    two_pair_rank = [pair_rank, max(pairs)]
-    print("Two pair!")
-    print(two_pair_rank)
+    if len(pairs)>1:
+        pairs.remove(max(pairs))
+        two_pair_rank = [pair_rank, max(pairs)]
+        player.best_hand['type'] = PokerHand.TwoPair
+        player.best_hand['kickers'] = two_pair_rank+[rank for rank in ranks if rank not in two_pair_rank][:1]
 
-threes = [rank for rank in ranks if ranks.count(rank) == 3]
-three_of_a_kind_rank = False
-if threes:
-    three_of_a_kind_rank = max(threes)
-    print("Three of a kind!")
-    print(three_of_a_kind_rank)
+    threes = [rank for rank in ranks if ranks.count(rank) == 3]
+    three_of_a_kind_rank = False
+    if threes:
+        three_of_a_kind_rank = max(threes)
+        player.best_hand['type'] = PokerHand.ThreeOfAKind
+        player.best_hand['kickers'] = [three_of_a_kind_rank]+[rank for rank in ranks if rank != three_of_a_kind_rank][:2]
 
-straight_count = 1
-last_rank = -1
-unique_ranks = list(set(ranks))
-unique_ranks.sort()
-straight_rank = False
-for rank in unique_ranks:
-    if last_rank + 1 == rank:
-        straight_count += 1
-        if straight_count >= 5:
-            straight_rank = rank
-    else:
-        straight_count = 1
-    last_rank = rank
-if straight_rank:
-    print("Straight!")
-    print(straight_rank)
-
-flush_suit_value = False
-flush_rank = False
-for suit in Suits:
-    if suits.count(suit.value) >= 5:
-        flush_rank = max([a for a in suits if a == suit.value])
-        flush_suit_value = suit.value
-        print("Flush!")
-        print(flush_rank)
-        break #It's only possible to get one flush per hand so we don't have to look further
-
-if three_of_a_kind_rank and pair_rank:
-    full_house_rank = three_of_a_kind_rank
-    print("Full house!")
-    print(full_house_rank)
-
-fours = [rank for rank in ranks if ranks.count(rank) == 4]
-four_of_a_kind_rank = False
-if fours:
-    four_of_a_kind_rank = max(fours)
-    print("Four of a kind!")
-    print(four_of_a_kind_rank)
-
-straight_flush_rank = False
-if flush_rank:
-    unique_flush_suite_ranks = list(set([card.rank.value for card in all_cards if card.suit.value == flush_suit_value]))
-    unique_flush_suite_ranks.sort()
-    straight_flush_count = 1
+    straight_count = 1
     last_rank = -1
-    for rank in unique_flush_suite_ranks:
+    unique_ranks = list(set(ranks))
+    unique_ranks.sort()
+    straight_rank = False
+    for rank in unique_ranks:
         if last_rank + 1 == rank:
-            straight_flush_count += 1
-            if straight_flush_count >= 5:
-                straight_flush_rank = rank
+            straight_count += 1
+            if straight_count >= 5:
+                straight_rank = rank
         else:
-            straight_flush_count = 1
+            straight_count = 1
         last_rank = rank
+    if straight_rank:
+        player.best_hand['type'] = PokerHand.Straight
+        player.best_hand['kickers'] = [straight_rank]
 
-if straight_flush_rank:
-    print("Straight flush!")
-    print(straight_flush_rank)
+    flush_suit_value = False
+    flush_rank = False
+    for suit in Suits:
+        if suits.count(suit.value) >= 5:
+            flush_rank = max([a for a in suits if a == suit.value])
+            flush_suit_value = suit.value
+            player.best_hand['type'] = PokerHand.Flush
+            player.best_hand['kickers'] = [flush_rank]
+            break #It's only possible to get one flush per hand so we don't have to look further
 
-royal_straight_flush_rank = False
-if straight_flush_rank == Ranks.Ace.value:
-    royal_straight_flush_rank = straight_flush_rank
+    if three_of_a_kind_rank and pair_rank:
+        full_house_rank = [three_of_a_kind_rank, pair_rank]
+        player.best_hand['type'] = PokerHand.FullHouse
+        player.best_hand['kickers'] = full_house_rank
 
-if royal_straight_flush_rank:
-    print("Royal straight flush!")
-    print(royal_straight_flush_rank)
+    fours = [rank for rank in ranks if ranks.count(rank) == 4]
+    four_of_a_kind_rank = False
+    if fours:
+        four_of_a_kind_rank = max(fours)
+        player.best_hand['type'] = PokerHand.FourOfAKind
+        player.best_hand['kickers'] = [four_of_a_kind_rank] #No need for kicker, two players can't have the same four of a kind
 
+    straight_flush_rank = False
+    if flush_rank:
+        unique_flush_suite_ranks = list(set([card.rank.value for card in all_cards if card.suit.value == flush_suit_value]))
+        unique_flush_suite_ranks.sort()
+        straight_flush_count = 1
+        last_rank = -1
+        for rank in unique_flush_suite_ranks:
+            if last_rank + 1 == rank:
+                straight_flush_count += 1
+                if straight_flush_count >= 5:
+                    straight_flush_rank = rank
+            else:
+                straight_flush_count = 1
+            last_rank = rank
 
+        if straight_flush_rank:
+            player.best_hand['type'] = PokerHand.StraightFlush
+            player.best_hand['kickers'] = [straight_flush_rank]
+
+            if straight_flush_rank == Ranks.Ace.value:
+                player.best_hand['type'] = PokerHand.RoyalFlush
+
+    if winning_players:
+        if player.best_hand["type"].value > winning_players[0].best_hand["type"].value:
+            winning_players = [player]
+        elif player.best_hand["type"].value == winning_players[0].best_hand["type"].value:
+            if player.best_hand["kickers"] > winning_players[0].best_hand["kickers"]:
+                winning_players = [player]
+            elif player.best_hand["kickers"] == winning_players[0].best_hand["kickers"]:
+                winning_players.append(player)
+    else:
+        winning_players = [player]
+
+if len(winning_players)>1:
+    print("Tie!")
+for player in winning_players:
+    print(f'{player.name} wins! ({player.best_hand["type"].name})')
