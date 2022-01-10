@@ -17,7 +17,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ## Q-Value Calculator
 class QValues():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
+    print(device)
     @staticmethod
     def get_current(policy_net, states, actions):
         return policy_net(states).gather(dim=1, index=actions.unsqueeze(-1)-1)
@@ -29,7 +29,7 @@ class QValues():
         non_final_states = next_states[non_final_state_locations]
         batch_size = next_states.shape[0]
         values = torch.zeros(batch_size).to(QValues.device)
-        values[non_final_state_locations] = target_net(non_final_states).max(dim=1)[0].detach()
+        values[non_final_state_locations] = target_net(non_final_states).max(dim=1)[0].detach().to(device)
         return values
         
         
@@ -42,9 +42,9 @@ class DQN(nn.Module):
         #Basic totalforbundet netværk (Hvad)
         #Input features = 2 hand, 5 community, wallet og bet. 
         super().__init__()
-        self.fc1 = nn.Linear(in_features=3, out_features=5).to(device)
-        self.fc2 = nn.Linear(in_features=5, out_features=5).to(device)
-        self.out = nn.Linear(in_features=5, out_features=4).to(device)
+        self.fc1 = nn.Linear(in_features=3, out_features=32)
+        self.fc2 = nn.Linear(in_features=32, out_features=7)
+        self.out = nn.Linear(in_features=7, out_features=4)
     
     
     # t bliver kørt igennem netværket, med ReLU aktiveringsfunktion
@@ -126,7 +126,7 @@ def plot(values, period):
     plt.clf()
     plt.title('Training')
     plt.xlabel('Episode')
-    plt.ylabel('Duration')
+    plt.ylabel('Reward')
     plt.plot(values)
     avg_reward = get_avg_reward(period, values)
     plt.plot(avg_reward)  
@@ -160,15 +160,15 @@ def extract_tensors(experiences):
 
 ## Parametre
 
-batch_size = 256
-gamma = 0.999
+batch_size = 1
+gamma = 0.99
 eps_start = 1  
-eps_end = 0.01      
+eps_end = 0.001      
 eps_decay = 0.0001
-target_update = 1000
-memory_size = 10000
-lr = 0.0001
-num_episodes = 1000000
+target_update = 2
+memory_size = 30
+lr = 0.01
+num_episodes = 100000
 
 ##Main Program
 
@@ -214,9 +214,9 @@ for episode in range(num_episodes):
             experiences = memory.sample(batch_size)
             states, actions, rewards, next_states = extract_tensors(experiences)
             
-            current_q_values = QValues.get_current(policy_net, states, actions)
-            next_q_values = QValues.get_next(target_net, next_states)
-            target_q_values = (next_q_values * gamma) + rewards 
+            current_q_values = QValues.get_current(policy_net, states, actions).to(device)
+            next_q_values = QValues.get_next(target_net, next_states).to(device)
+            target_q_values = (next_q_values * gamma) + rewards.to(device)
             
             loss = F.mse_loss(current_q_values, target_q_values.unsqueeze(1))
             optimizer.zero_grad()
