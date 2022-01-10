@@ -103,7 +103,7 @@ class Game:
         self.community_card = 0
         self.is_done = False
         self.is_pre_flop = True
-        self.pot = 0
+        self.pot = self.small_blind + self.big_blind
         self.winners = []
         self.num_rounds = 0
 
@@ -170,7 +170,7 @@ class Game:
             elif action == Actions.Call.value:
                 self.active_player.wallet -= 1
                 self.active_player.bet += 1
-                self.round.pot += 1
+                self.pot += 1
                 self.round.last_action = Actions.Call.value
 
             elif action == Actions.Raise.value:
@@ -179,7 +179,7 @@ class Game:
                 bet = self.round.bet_to_call - self.active_player.bet
                 self.active_player.wallet -= bet
                 self.active_player.bet += bet
-                self.round.pot += bet
+                self.pot += bet
                 self.round.last_action = Actions.Raise.value
 
             elif action == Actions.Fold.value:
@@ -198,7 +198,6 @@ class Game:
                     round_done = False
                     break
             if round_done:
-                self.pot += self.round.pot
                 for player in self.players:
                     player.bet = 0
                 
@@ -285,7 +284,7 @@ class Game:
             self.winners[1].wallet += self.pot/2
         else:
             self.winners[0].wallet += self.pot
-            #print(f'{self.winners[0].name} has won!')
+            #print(f'{self.winners[0].name} has won! {self.winners[0].wallet}')
     
     def get_state(self):
         reward = 0

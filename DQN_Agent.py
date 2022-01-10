@@ -12,6 +12,7 @@ from itertools import count
 import leduc
     
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 ## Q-Value Calculator
 class QValues():
@@ -41,9 +42,9 @@ class DQN(nn.Module):
         #Basic totalforbundet netværk (Hvad)
         #Input features = 2 hand, 5 community, wallet og bet. 
         super().__init__()
-        self.fc1 = nn.Linear(in_features=3, out_features=12)
-        self.fc2 = nn.Linear(in_features=12, out_features=10)
-        self.out = nn.Linear(in_features=10, out_features=4)
+        self.fc1 = nn.Linear(in_features=3, out_features=5).to(device)
+        self.fc2 = nn.Linear(in_features=5, out_features=5).to(device)
+        self.out = nn.Linear(in_features=5, out_features=4).to(device)
     
     
     # t bliver kørt igennem netværket, med ReLU aktiveringsfunktion
@@ -134,11 +135,11 @@ def plot(values, period):
     #if is_ipython: display.clear_output(wait=True)
 
 def get_avg_reward(period, values):
-    values = torch.tensor(values, dtype=torch.float)
+    values = torch.tensor(values, dtype=torch.float).to(device)
     if len(values) >= period:
         avg_reward = values.unfold(dimension=0, size=period, step=1).mean(dim=1).flatten(start_dim=0)
-        avg_reward = torch.cat((torch.zeros(period-1), avg_reward))
-        return avg_reward.numpy()
+        avg_reward = torch.cat((torch.zeros(period-1).to(device), avg_reward))
+        return avg_reward.cpu().numpy()
     else:
         avg_reward = torch.zeros(len(values))
         return avg_reward.numpy()                        
@@ -160,18 +161,16 @@ def extract_tensors(experiences):
 ## Parametre
 
 batch_size = 256
-gamma = 0.999 
+gamma = 0.999
 eps_start = 1  
 eps_end = 0.01      
-eps_decay = 0.001
-target_update = 10
-memory_size = 10000 
-lr = 0.001
+eps_decay = 0.0001
+target_update = 1000
+memory_size = 10000
+lr = 0.0001
 num_episodes = 1000000
 
 ##Main Program
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 player = leduc.Player("Billy Ailish", 10)
 algo = leduc.Player("Bob", 10)
@@ -205,10 +204,10 @@ for episode in range(num_episodes):
 
     for timestep in count():
         valid_actions = env.get_actions()
-        action = agent.select_action(torch.FloatTensor([state]), policy_net, valid_actions)
+        action = agent.select_action(torch.FloatTensor([state]).to(device), policy_net, valid_actions)
         env.do_action(int(action))
         reward, next_state, is_done = env.get_state()
-        memory.push(Experience(torch.FloatTensor([state]), torch.LongTensor([action]), torch.FloatTensor([next_state]), torch.FloatTensor([reward])))
+        memory.push(Experience(torch.FloatTensor([state]).to(device), torch.LongTensor([action]).to(device), torch.FloatTensor([next_state]).to(device), torch.FloatTensor([reward]).to(device)))
         state = next_state
         
         if memory.can_provide_sample(batch_size):
