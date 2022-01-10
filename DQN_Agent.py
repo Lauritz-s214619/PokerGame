@@ -8,6 +8,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
+from itertools import count
+import leduc
     
 
 
@@ -17,17 +19,16 @@ class QValues():
     
     @staticmethod
     def get_current(policy_net, states, actions):
-        return policy_net(states).gather(dim=1, index=actions.unsqueeze(-1))
+        return policy_net(states).gather(dim=1, index=actions.unsqueeze(-1)-1)
     
     @staticmethod
     def get_next(target_net, next_states):
-        final_state_locations = next_states.flatten(start_dim=1) \
-            .max(dim=1)[0].eq(0).type(torch.bool)
+        final_state_locations = next_states.flatten(start_dim=1).max(dim=1)[0].eq(0).type(torch.bool)
         non_final_state_locations = (final_state_locations == False)
         non_final_states = next_states[non_final_state_locations]
         batch_size = next_states.shape[0]
         values = torch.zeros(batch_size).to(QValues.device)
-        values[non_final_state_locations] = target_net(non_final_states).max(dim=1)[0].detacht()
+        values[non_final_state_locations] = target_net(non_final_states).max(dim=1)[0].detach()
         return values
         
         
@@ -35,17 +36,18 @@ class QValues():
     
 # Det neurale netværk som approksimere q-værdier
 class DQN(nn.Module):
-    def __init__(self,hand, wallet,actions,community_card,number_of_players,Highest_raise,small_blind):
+    def __init__(self):
         
         #Basic totalforbundet netværk (Hvad)
         #Input features = 2 hand, 5 community, wallet og bet. 
-        self.fc1 = nn.Linear(in_features=9, out_features=24)
-        self.fc2 = nn.Linear(in_features=24, out_features=32)
-        self.out = nn.Linear(in_features=32, out_features=4)
+        super().__init__()
+        self.fc1 = nn.Linear(in_features=3, out_features=12)
+        self.fc2 = nn.Linear(in_features=12, out_features=10)
+        self.out = nn.Linear(in_features=10, out_features=4)
     
     
     # t bliver kørt igennem netværket, med ReLU aktiveringsfunktion
-    def forward(self,t):
+    def forward(self, t):
         t = t.flatten(start_dim=1)
         t = F.relu(self.fc1(t))
         t = F.relu(self.fc2(t))
@@ -89,41 +91,67 @@ class EpsilonGreedyStrategy():
         self.decay = decay
 
     def get_exploration_rate(self, current_step):
-        return self.end + (self.start-self.end) * math.exp(-1. * \
-                           current_step * self.decay)
+        return self.end + (self.start-self.end) * math.exp(-1. * current_step * self.decay)
 
 ## Reinforcement Learning Agent
 
 class Agent():
     #Skal have en epsilon Greedy strategy og antal actions (og gpu/cpu)
-    def __init__(self,strategy, num_actions, device):
+    def __init__(self,strategy, device):
         self.current_step=0
         self.strategy = strategy
-        self.num_actions = num_actions
+        self.device = device
 
-    def select_action(self,state,policy_net):
+    def select_action(self, state, policy_net, valid_actions):
         rate = strategy.get_exploration_rate(self.current_step)
         self.current_step += 1
 
         if rate > random.random():
-            action = random.randrange(self.num_actions)
-            return torch.tensor([action]).to(device)   #  explore
+            action = random.choice(valid_actions)
+            return torch.tensor([action]).to(self.device)   #  explore
         else:
             # no_grad da vi ikke vil opdatere gradienten til NN
             with torch.no_grad():
-                return policy_net(state.argmax(dim=1).item().to(device)) # exploit
+                out = policy_net(state)
+                valid_out = out[:,np.array(valid_actions)-1]
+                idx = (out==max(valid_out[0])).nonzero(as_tuple=True)[1]
+                return idx.to(self.device) + 1 # exploit
                               
-                        
+
+
+## Plot function
+def plot(values, period):
+    plt.figure(2)
+    plt.clf()
+    plt.title('Training')
+    plt.xlabel('Episode')
+    plt.ylabel('Duration')
+    plt.plot(values)
+    avg_reward = get_avg_reward(period, values)
+    plt.plot(avg_reward)  
+    plt.pause(0.001)
+    #print("Episode", len(values), "\n", period, "episode moving avg:", avg_reward[-1])
+    #if is_ipython: display.clear_output(wait=True)
+
+def get_avg_reward(period, values):
+    values = torch.tensor(values, dtype=torch.float)
+    if len(values) >= period:
+        avg_reward = values.unfold(dimension=0, size=period, step=1).mean(dim=1).flatten(start_dim=0)
+        avg_reward = torch.cat((torch.zeros(period-1), avg_reward))
+        return avg_reward.numpy()
+    else:
+        avg_reward = torch.zeros(len(values))
+        return avg_reward.numpy()                        
 
 ## Tensor processing
 
-def extract_tensort(experiences):
+def extract_tensors(experiences):
     
     batch = Experience(*zip(*experiences))
     
     t1 = torch.cat(batch.state)
     t2 = torch.cat(batch.action)
-    t3 = torch.cat(batch_reward)
+    t3 = torch.cat(batch.reward)
     t4 = torch.cat(batch.next_state)
     
     return (t1,t2,t3,t4)
@@ -143,34 +171,51 @@ num_episodes = 1000000
 
 ##Main Program
 
-device = troch.device("cuda" if torch.cuda.is_available() else "cpu")
-#em
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+player = leduc.Player("Billy Ailish", 10)
+algo = leduc.Player("Bob", 10)
+player.role = leduc.Roles.SmallBlind
+algo.role = leduc.Roles.BigBlind
+env = leduc.Game(leduc.Deck(), [player, algo])
+env.deal_cards(1)
+env.start()
+
 strategy = EpsilonGreedyStrategy(eps_start,eps_end, eps_decay)
-agent = Agent(strategy, #em
+agent = Agent(strategy, device)
 memory = ReplayMemory(memory_size)
 
-policy_net = DQN(#em)
-target_net = DQN(#em) 
+policy_net = DQN()
+target_net = DQN() 
 target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()
-optimizier = optim.Adam(params=policy_net.parameters(), lr=lr)
+optimizer = optim.Adam(params=policy_net.parameters(), lr=lr)
 
+episode_rewards = []
 for episode in range(num_episodes):
-    #em.reset(
-    state = #VI skal have state her
-    
+    player = leduc.Player("Billy Ailish", 10)
+    algo = leduc.Player("Bob", 10)
+    player.role = leduc.Roles.SmallBlind
+    algo.role = leduc.Roles.BigBlind
+    env = leduc.Game(leduc.Deck(), [player, algo])
+    env.deal_cards(1)
+    env.start()
+
+    _, state, _ = env.get_state()
+
     for timestep in count():
-        action = agent.select_action(state,policy_net)
-        reward = #Hvad er reward?
-        next_state = #Hvor ender vi efter?
-        memory.push(Experience(state, action, next_state, reward))
+        valid_actions = env.get_actions()
+        action = agent.select_action(torch.FloatTensor([state]), policy_net, valid_actions)
+        env.do_action(int(action))
+        reward, next_state, is_done = env.get_state()
+        memory.push(Experience(torch.FloatTensor([state]), torch.LongTensor([action]), torch.FloatTensor([next_state]), torch.FloatTensor([reward])))
         state = next_state
         
         if memory.can_provide_sample(batch_size):
             experiences = memory.sample(batch_size)
             states, actions, rewards, next_states = extract_tensors(experiences)
             
-            current_q_values = QValues.get_current(policy_net,states, actions)
+            current_q_values = QValues.get_current(policy_net, states, actions)
             next_q_values = QValues.get_next(target_net, next_states)
             target_q_values = (next_q_values * gamma) + rewards 
             
@@ -179,8 +224,11 @@ for episode in range(num_episodes):
             loss.backward()
             optimizer.step()
             
-        if #em.done:
+        if is_done:
             #plot?
+            episode_rewards.append(reward)
+            if len(episode_rewards) % 100 == 0:
+                plot(episode_rewards, 100)
             break
         
     if episode % target_update == 0:
