@@ -42,9 +42,9 @@ class DQN(nn.Module):
         #Basic totalforbundet netværk (Hvad)
         #Input features = 2 hand, 5 community, wallet og bet. 
         super().__init__()
-        self.fc1 = nn.Linear(in_features=3, out_features=32)
-        self.fc2 = nn.Linear(in_features=32, out_features=7)
-        self.out = nn.Linear(in_features=7, out_features=4)
+        self.fc1 = nn.Linear(in_features=3, out_features=32).to(device)
+        self.fc2 = nn.Linear(in_features=32, out_features=7).to(device)
+        self.out = nn.Linear(in_features=7, out_features=4).to(device)
     
     
     # t bliver kørt igennem netværket, med ReLU aktiveringsfunktion
@@ -160,15 +160,15 @@ def extract_tensors(experiences):
 
 ## Parametre
 
-batch_size = 1
-gamma = 0.99
+batch_size = 256
+gamma = 0.999 
 eps_start = 1  
-eps_end = 0.001      
-eps_decay = 0.0001
-target_update = 2
-memory_size = 30
-lr = 0.01
-num_episodes = 100000
+eps_end = 0.01      
+eps_decay = 0.001
+target_update = 100
+memory_size = 10000 
+lr = 0.001
+num_episodes = 1000000
 
 ##Main Program
 
