@@ -16,7 +16,6 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 ## Q-Value Calculator
 class QValues():
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(device)
     @staticmethod
     def get_current(policy_net, states, actions):
@@ -28,7 +27,7 @@ class QValues():
         non_final_state_locations = (final_state_locations == False)
         non_final_states = next_states[non_final_state_locations]
         batch_size = next_states.shape[0]
-        values = torch.zeros(batch_size).to(QValues.device)
+        values = torch.zeros(batch_size).to(device)
         values[non_final_state_locations] = target_net(non_final_states).max(dim=1)[0].detach().to(device)
         return values
         
@@ -160,15 +159,15 @@ def extract_tensors(experiences):
 
 ## Parametre
 
-batch_size = 256
-gamma = 0.999 
+batch_size = 128
+gamma = 0.99    
 eps_start = 1  
 eps_end = 0.01      
 eps_decay = 0.001
-target_update = 100
-memory_size = 10000 
-lr = 0.001
-num_episodes = 1000000
+target_update = 5
+memory_size = 1024
+lr = 0.00001
+num_episodes = 10000
 
 ##Main Program
 
@@ -191,6 +190,7 @@ target_net.eval()
 optimizer = optim.Adam(params=policy_net.parameters(), lr=lr)
 
 episode_rewards = []
+num_wins = 0
 for episode in range(num_episodes):
     player = leduc.Player("Billy Ailish", 10)
     algo = leduc.Player("Bob", 10)
@@ -207,6 +207,7 @@ for episode in range(num_episodes):
         action = agent.select_action(torch.FloatTensor([state]).to(device), policy_net, valid_actions)
         env.do_action(int(action))
         reward, next_state, is_done = env.get_state()
+        #reward = -reward
         memory.push(Experience(torch.FloatTensor([state]).to(device), torch.LongTensor([action]).to(device), torch.FloatTensor([next_state]).to(device), torch.FloatTensor([reward]).to(device)))
         state = next_state
         
@@ -226,8 +227,12 @@ for episode in range(num_episodes):
         if is_done:
             #plot?
             episode_rewards.append(reward)
+            if reward>0:
+                num_wins += 1
             if len(episode_rewards) % 100 == 0:
-                plot(episode_rewards, 100)
+                plot(episode_rewards, 1000)
+                print(sum(episode_rewards[len(episode_rewards)-1000:])/1000)
+                print(f"{(num_wins / episode)*100:.2F}%")
             break
         
     if episode % target_update == 0:

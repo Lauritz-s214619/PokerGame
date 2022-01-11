@@ -187,6 +187,7 @@ class Game:
                 self.round.last_action = Actions.Fold.value
                 self.winners = [player for player in self.players if player != self.active_player]
                 self.get_winner()
+                return
         else:
             print(f"Error, invalid action! {valid_actions} {action} {self.active_player.name}")
         
