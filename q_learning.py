@@ -88,6 +88,7 @@ for r in rewards_per_thousand_episodes:
 #Testing the q-table
 num_test_episodes = 10000
 num_test_wins = 0
+wallet = num_test_episodes*10
 for episode in range(num_test_episodes):
     player = Player("Billy Ailish", 10)
     algo = Player("Bob", 10)
@@ -120,6 +121,10 @@ for episode in range(num_test_episodes):
             num_test_wins += 1
 
         if done:
+            wallet += reward
             break
 
 print(f"Test win rate: {num_test_wins/num_test_episodes*100:.2F}%")
+print(f"Test start wallet: {num_test_episodes*10}")
+print(f"Test end wallet: {wallet}")
+print(f"Won: {wallet-num_test_episodes*10}")

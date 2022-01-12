@@ -25,10 +25,10 @@ class Ranks(Enum):
     Ace   = 14
 
 class Actions(Enum):
-    Check = 1
-    Call  = 2
-    Raise = 3
-    Fold  = 4
+    Check = 0
+    Call  = 1
+    Raise = 2
+    Fold  = 3
 
 class PokerHand(Enum):
     HighestCard = 0
@@ -64,7 +64,7 @@ class Card:
 
 class Deck:
     def __init__(self, shuffle_cards = True):
-        self.cards = [Card(Suits(x), Ranks(y), y-10+x*3) for y in range(11,14) for x in range(2)]
+        self.cards = [Card(Suits(x), Ranks(y), y-11+x*3) for y in range(11,14) for x in range(2)]
         if shuffle_cards:
             random.shuffle(self.cards)
     
@@ -90,7 +90,7 @@ class Round:
         self.bet_to_call = bet_to_call
         self.is_done = False
         self.num_actions = 0
-        self.last_action = 0
+        self.last_action = None
         self.num_raises = 0
 
 class Game:
@@ -285,14 +285,21 @@ class Game:
             self.winners[1].wallet += self.pot/2
         else:
             self.winners[0].wallet += self.pot
-            #print(f'{self.winners[0].name} has won! {self.winners[0].wallet}')
+            # if self.pot>8 and self.winners[0].name != "Bob":
+            #     print(f"pot: {self.pot}")
+            #     print(f'{self.winners[0].name} has won! {self.winners[0].wallet}')
     
     def get_state(self):
         reward = 0
-        community_card = 0
-        if self.community_card:
-            community_card = self.community_card.id
         if self.is_done:
             reward = self.players[0].wallet - 10
         
-        return reward, [self.players[0].card.id, community_card, self.round.last_action], self.is_done
+        state = [0]*16
+        state[self.players[0].card.id] = 1
+        if self.community_card:
+            state[self.community_card.id+6] = 1
+        if self.round.last_action:
+            state[self.round.last_action+12] = 1
+
+
+        return reward, state, self.is_done
