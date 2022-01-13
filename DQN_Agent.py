@@ -9,13 +9,14 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from itertools import count
-import leduc
+from leduc import *
 import os
 
 
 policy_net_path = './models/policy_net.pt'
 target_net_path = './models/target_net.pt'
-train = False    
+train = True
+save = False 
 
 device = torch.device("cpu" if torch.cuda.is_available() else "cpu")
 
@@ -177,11 +178,11 @@ num_episodes = 10000
 
 ##Main Program
 
-player = leduc.Player("Billy Ailish", 10)
-algo = leduc.Player("Bob", 10, True)
-player.role = leduc.Roles.SmallBlind
-algo.role = leduc.Roles.BigBlind
-env = leduc.Game([player, algo])
+player = Player("Billy Ailish", 10)
+algo = Player("Bob", 10, True)
+player.role = Roles.SmallBlind
+algo.role = Roles.BigBlind
+env = Game([player, algo])
 env.reset()
 
 strategy = EpsilonGreedyStrategy(eps_start, eps_end, eps_decay, eps_steps)
@@ -247,12 +248,13 @@ if train:
             target_net.load_state_dict(policy_net.state_dict())
     
     #Save models
-    torch.save(policy_net.state_dict(), './models/policy_net.pt')
-    torch.save(target_net.state_dict(), './models/target_net.pt')
+    if save:
+        torch.save(policy_net.state_dict(), './models/policy_net.pt')
+        torch.save(target_net.state_dict(), './models/target_net.pt')
 
 
 
-#Test
+# #Test
 num_test_episodes = 1000
 wallet = num_test_episodes*10
 num_test_wins = 0
@@ -269,67 +271,6 @@ for episode in range(num_test_episodes):
                 valid_out = out[:,np.array(valid_actions)]
                 idx = (out==max(valid_out[0])).nonzero(as_tuple=True)[1]
                 env.do_action(int(idx.to(device)))
-            
-        if is_done:
-            wallet += reward
-            if reward>=0:
-                num_test_wins += 1
-                win_size[int(reward)] += 1
-            else:
-                loss_size[abs(int(reward))-1] += 1
-            break
-
-print(f"Test win rate: {(num_test_wins / num_test_episodes)*100:.2F}%")
-print(f"Test start wallet: {num_test_episodes*10}")
-print(f"Test end wallet: {wallet}")
-print(f"Won: {wallet-num_test_episodes*10}")
-print(f"Win sizes: {win_size}")
-print(f"Loss sizes: {loss_size}")
-
-
-
-
-#Human vs AI
-AI = leduc.Player("Billy Ailish", 10)
-human = leduc.Player("Player", 10)
-AI.role = leduc.Roles.SmallBlind
-human.role = leduc.Roles.BigBlind
-env = leduc.Game([AI, human])
-env.reset()
-
-
-num_test_episodes = 1000
-wallet = num_test_episodes*10
-num_test_wins = 0
-win_size = np.zeros((11))
-loss_size = np.zeros((10))
-for episode in range(num_test_episodes):
-    env.reset()
-    print("New game!")
-
-    for timestep in count():
-        print(f"Round: {env.num_rounds}")
-        reward, state, is_done = env.get_state()
-        valid_actions = env.get_actions()
-
-        if env.active_player == AI:
-            with torch.no_grad():
-                    out = policy_net(torch.FloatTensor([state]).to(device))
-                    valid_out = out[:,np.array(valid_actions)]
-                    idx = (out==max(valid_out[0])).nonzero(as_tuple=True)[1]
-                    action = int(idx.to(device))
-                    env.do_action(action)
-                    print(f"AI action: {leduc.Actions(action)}")
-        else:
-            action_completed = False
-            print(valid_actions)
-            while not action_completed:
-                try:
-                    action = int(input("Select action: "))
-                    action_completed = True
-                except ValueError:
-                    print("Please enter an integer")
-            env.do_action(action)        
             
         if is_done:
             wallet += reward

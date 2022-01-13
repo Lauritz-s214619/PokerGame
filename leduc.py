@@ -72,7 +72,7 @@ class Deck:
         return self.cards.pop()
 
 class Player:
-    def __init__(self, name, wallet, is_algo = False):
+    def __init__(self, name, wallet, is_algo = False, show_card = True):
         self.name = name
         self.card = None
         self.wallet = wallet
@@ -81,9 +81,15 @@ class Player:
         self.is_all_in = False
         self.role = Roles.Player
         self.is_algo = is_algo
+        self.show_card = show_card
     
     def show_cards(self):
         return [str(card) for card in self.hand.cards]
+    
+    def __eq__(self, other):
+        if not isinstance(other, Player):
+            return NotImplemented
+        return self.name == other.name
 
 class Round:
     def __init__(self, bet_to_call = 0):
@@ -95,7 +101,7 @@ class Round:
         self.num_raises = 0
 
 class Game:
-    def __init__(self, players):
+    def __init__(self, players, verbose = False):
         self.deck = Deck()
         self.players = players
         self.active_player = None
@@ -107,6 +113,7 @@ class Game:
         self.pot = self.small_blind + self.big_blind
         self.winners = []
         self.num_rounds = 0
+        self.verbose = verbose
 
     def get_actions(self):
         actions = []
@@ -135,8 +142,12 @@ class Game:
     def new_round(self, bet_to_call = 0):
         self.num_rounds += 1
         self.round = Round(bet_to_call)
+        if self.verbose:
+            print(f"\nRound {self.num_rounds}")
     
     def reset(self):
+        if self.verbose:
+            print("\nNew game!")
         self.deck = Deck()
         self.active_player = None
         self.community_card = 0
@@ -171,10 +182,15 @@ class Game:
         else:
             self.active_player = self.players[0]
 
+        if self.verbose:
+            self.print_info()
+
         if self.active_player.is_algo:
                 self.do_algo_action()
     
     def do_action(self, action):
+        if self.verbose:
+            print(f"{Actions(action).name}!")
         valid_actions = self.get_actions()
         if action in valid_actions:
 
@@ -224,6 +240,9 @@ class Game:
                     self.new_round()
 
         self.active_player = [player for player in self.players if player != self.active_player][0]
+        
+        if self.verbose and not self.is_done:
+            self.print_info()
 
         if self.active_player.is_algo and not self.is_done:
             self.do_algo_action()
@@ -289,19 +308,22 @@ class Game:
                 self.winners = self.players
             
             for player in self.players:
-                if player.card == self.community_card:
+                if player.card.rank == self.community_card.rank:
                     self.winners = [player]
                     break
                 
         if len(self.winners) > 1:
-            #print("It's a tie!")
+            if self.verbose:
+                print("\nIt's a tie!")
             self.winners[0].wallet += self.pot/2
             self.winners[1].wallet += self.pot/2
         else:
             self.winners[0].wallet += self.pot
-            # if self.pot>8 and self.winners[0].name != "Bob":
-            #     print(f"pot: {self.pot}")
-            #     print(f'{self.winners[0].name} has won! {self.winners[0].wallet}')
+            if self.verbose:
+                print(f'\n{self.winners[0].name} has won!')
+        if self.verbose:
+            print(f'{self.players[0].name} card: {self.players[0].card}')
+            print(f'{self.players[1].name} card: {self.players[1].card}')
     
     def get_state(self):
         reward = 0
@@ -317,3 +339,14 @@ class Game:
 
 
         return reward, state, self.is_done
+    
+    def print_info(self):
+        valid_actions = self.get_actions()
+        if self.active_player.show_card:
+            print(f'\n{self.active_player.name} - {self.active_player.card} - Wallet: {self.active_player.wallet} - Pot: {self.pot}')
+            print(f'Bet to call: {self.round.bet_to_call}')
+            if self.community_card:
+                print(f"Community card: {self.community_card}")
+            print("\n".join(map(lambda x: f"{x}: {Actions(x).name}", valid_actions)))
+        else:
+            print(f'\n{self.active_player.name} - Wallet: {self.active_player.wallet}')
