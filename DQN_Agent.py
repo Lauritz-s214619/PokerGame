@@ -10,7 +10,12 @@ import torch.optim as optim
 import torch.nn.functional as F
 from itertools import count
 import leduc
-    
+import os
+
+
+policy_net_path = './models/policy_net.pt'
+target_net_path = './models/target_net.pt'
+train = False    
 
 device = torch.device("cpu" if torch.cuda.is_available() else "cpu")
 
@@ -22,14 +27,8 @@ class QValues():
         return policy_net(states).gather(dim=1, index=actions.unsqueeze(-1))
     
     @staticmethod
-    def get_next(target_net, next_states):
-        final_state_locations = next_states.flatten(start_dim=1).max(dim=1)[0].eq(0).type(torch.bool)
-        non_final_state_locations = (final_state_locations == False)
-        non_final_states = next_states[non_final_state_locations]
-        batch_size = next_states.shape[0]
-        values = torch.zeros(batch_size).to(device)
-        values[non_final_state_locations] = target_net(non_final_states).max(dim=1)[0].detach().to(device)
-        return values
+    def get_next(target_net, next_states, valid_actions):
+        return torch.tensor([float(max(el[valid_actions[idx]])) for idx,el in enumerate(target_net(next_states))]).float()
         
         
 ## DQN
@@ -57,7 +56,7 @@ class DQN(nn.Module):
 
 ## Experience
 
-Experience = namedtuple('Experience',('state','action','next_state','reward'))
+Experience = namedtuple('Experience',('state','action','next_state','reward', 'valid_actions'))
 
 class ReplayMemory():
     # Memory er der vi gemmer experience
@@ -85,13 +84,15 @@ class ReplayMemory():
 ## Epsilon Greedy Strategy
 
 class EpsilonGreedyStrategy():
-    def __init__(self, start, end, decay):
+    def __init__(self, start, end, decay, steps):
         self.start = start
         self.end = end 
         self.decay = decay
+        self.steps = steps
 
     def get_exploration_rate(self, current_step):
         return self.end + (self.start-self.end) * math.exp(-1. * current_step * self.decay)
+        #return self.start - min(current_step/self.steps,1)*(self.start-self.end)
 
 ## Reinforcement Learning Agent
 
@@ -128,6 +129,7 @@ def plot(values, period):
     plt.title(f'Training, Eps: {agent.eps}')
     plt.xlabel('Episode')
     plt.ylabel('Reward')
+    plt.ylim(-1,1)
     plt.plot(values)
     avg_reward = get_avg_reward(period, values)
     plt.plot(avg_reward)  
@@ -150,13 +152,14 @@ def get_avg_reward(period, values):
 def extract_tensors(experiences):
     
     batch = Experience(*zip(*experiences))
-    
+
     t1 = torch.cat(batch.state)
     t2 = torch.cat(batch.action)
     t3 = torch.cat(batch.reward)
     t4 = torch.cat(batch.next_state)
+    t5 = [val.numpy()[0].astype(int) for val in batch.valid_actions]
     
-    return (t1,t2,t3,t4)
+    return (t1,t2,t3,t4,t5)
 
 
 ## Parametre
@@ -166,6 +169,7 @@ gamma = 0.99
 eps_start = 1  
 eps_end = 0.1      
 eps_decay = 0.0005
+eps_steps = 10000
 target_update = 1000
 memory_size = 20000
 lr = 0.00005
@@ -174,71 +178,73 @@ num_episodes = 10000
 ##Main Program
 
 player = leduc.Player("Billy Ailish", 10)
-algo = leduc.Player("Bob", 10)
+algo = leduc.Player("Bob", 10, True)
 player.role = leduc.Roles.SmallBlind
 algo.role = leduc.Roles.BigBlind
-env = leduc.Game(leduc.Deck(), [player, algo])
-env.deal_cards(1)
-env.start()
+env = leduc.Game([player, algo])
+env.reset()
 
-strategy = EpsilonGreedyStrategy(eps_start,eps_end, eps_decay)
+strategy = EpsilonGreedyStrategy(eps_start, eps_end, eps_decay, eps_steps)
 agent = Agent(strategy, device)
 memory = ReplayMemory(memory_size)
 
 policy_net = DQN()
-target_net = DQN() 
-target_net.load_state_dict(policy_net.state_dict())
+if os.path.exists(policy_net_path):
+    policy_net.load_state_dict(torch.load(policy_net_path))
+    policy_net.eval()
+
+target_net = DQN()
+if os.path.exists(target_net_path):
+    target_net.load_state_dict(torch.load(target_net_path))
+else:
+    target_net.load_state_dict(policy_net.state_dict())
 target_net.eval()
-optimizer = optim.Adam(params=policy_net.parameters(), lr=lr)
 
-episode_rewards = []
-num_wins = 0
-for episode in range(num_episodes):
-    player = leduc.Player("Billy Ailish", 10)
-    algo = leduc.Player("Bob", 10)
-    player.role = leduc.Roles.SmallBlind
-    algo.role = leduc.Roles.BigBlind
-    env = leduc.Game(leduc.Deck(), [player, algo])
-    env.deal_cards(1)
-    env.start()
+if train:
+    optimizer = optim.Adam(params=policy_net.parameters(), lr=lr)
+    episode_rewards = []
+    num_wins = 0
+    for episode in range(num_episodes):
+        env.reset()
 
-    _, state, _ = env.get_state()
+        _, state, _ = env.get_state()
 
-    for timestep in count():
-        valid_actions = env.get_actions()
-        action = agent.select_action(torch.FloatTensor([state]).to(device), policy_net, valid_actions)
-        env.do_action(int(action))
-        reward, next_state, is_done = env.get_state()
-        #reward = reward**3
-        memory.push(Experience(torch.FloatTensor([state]).to(device), torch.LongTensor([action]).to(device), torch.FloatTensor([next_state]).to(device), torch.FloatTensor([reward]).to(device)))
-        state = next_state
-        
-        if memory.can_provide_sample(batch_size):
-            experiences = memory.sample(batch_size)
-            states, actions, rewards, next_states = extract_tensors(experiences)
-            current_q_values = QValues.get_current(policy_net, states, actions).to(device)
-            next_q_values = QValues.get_next(target_net, next_states).to(device)
-            target_q_values = (next_q_values * gamma) + rewards.to(device)
+        for timestep in count():
+            valid_actions = env.get_actions()
+            action = agent.select_action(torch.FloatTensor([state]).to(device), policy_net, valid_actions)
+            env.do_action(int(action))
+            reward, next_state, is_done = env.get_state()
+            new_valid_actions = env.get_actions()
+            #reward = reward**3
+            memory.push(Experience(torch.FloatTensor([state]).to(device), torch.LongTensor([action]).to(device), torch.FloatTensor([next_state]).to(device), torch.FloatTensor([reward]).to(device), torch.FloatTensor([new_valid_actions]).to(device)))
+            state = next_state
             
-            loss = F.mse_loss(current_q_values, target_q_values.unsqueeze(1))
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+            if memory.can_provide_sample(batch_size):
+                experiences = memory.sample(batch_size)
+                states, actions, rewards, next_states, valid_actions = extract_tensors(experiences)
+                current_q_values = QValues.get_current(policy_net, states, actions).to(device)
+                next_q_values = QValues.get_next(target_net, next_states, valid_actions).to(device)
+                target_q_values = (next_q_values * gamma) + rewards.to(device)
+                
+                loss = F.mse_loss(current_q_values, target_q_values.unsqueeze(1))
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                
+            if is_done:
+                #plot?
+                episode_rewards.append(reward)
+                if reward>0:
+                    num_wins += 1
+                if len(episode_rewards) % 100 == 0:
+                    plot(episode_rewards, 1000)
+                    print(sum(episode_rewards[len(episode_rewards)-1000:])/1000)
+                    print(f"{num_wins}%")
+                    num_wins = 0
+                break
             
-        if is_done:
-            #plot?
-            episode_rewards.append(reward)
-            if reward>0:
-                num_wins += 1
-            if len(episode_rewards) % 100 == 0:
-                plot(episode_rewards, 1000)
-                print(sum(episode_rewards[len(episode_rewards)-1000:])/1000)
-                print(f"{num_wins}%")
-                num_wins = 0
-            break
-        
-    if episode % target_update == 0:
-        target_net.load_state_dict(policy_net.state_dict())
+        if episode % target_update == 0:
+            target_net.load_state_dict(policy_net.state_dict())
 
 
 
@@ -249,13 +255,7 @@ num_test_wins = 0
 win_size = np.zeros((11))
 loss_size = np.zeros((10))
 for episode in range(num_test_episodes):
-    player = leduc.Player("Billy Ailish", 10)
-    algo = leduc.Player("Bob", 10)
-    player.role = leduc.Roles.SmallBlind
-    algo.role = leduc.Roles.BigBlind
-    env = leduc.Game(leduc.Deck(), [player, algo])
-    env.deal_cards(1)
-    env.start()
+    env.reset()
 
     for timestep in count():
         reward, state, is_done = env.get_state()
@@ -265,6 +265,70 @@ for episode in range(num_test_episodes):
                 valid_out = out[:,np.array(valid_actions)]
                 idx = (out==max(valid_out[0])).nonzero(as_tuple=True)[1]
                 env.do_action(int(idx.to(device)))
+            
+        if is_done:
+            wallet += reward
+            if reward>=0:
+                num_test_wins += 1
+                win_size[int(reward)] += 1
+            else:
+                loss_size[abs(int(reward))-1] += 1
+            break
+
+print(f"Test win rate: {(num_test_wins / num_test_episodes)*100:.2F}%")
+print(f"Test start wallet: {num_test_episodes*10}")
+print(f"Test end wallet: {wallet}")
+print(f"Won: {wallet-num_test_episodes*10}")
+print(f"Win sizes: {win_size}")
+print(f"Loss sizes: {loss_size}")
+
+torch.save(policy_net.state_dict(), './models/policy_net.pt')
+torch.save(target_net.state_dict(), './models/target_net.pt')
+
+
+
+
+#Human vs AI
+AI = leduc.Player("Billy Ailish", 10)
+human = leduc.Player("Player", 10)
+AI.role = leduc.Roles.SmallBlind
+human.role = leduc.Roles.BigBlind
+env = leduc.Game([AI, human])
+env.reset()
+
+
+num_test_episodes = 1000
+wallet = num_test_episodes*10
+num_test_wins = 0
+win_size = np.zeros((11))
+loss_size = np.zeros((10))
+for episode in range(num_test_episodes):
+    env.reset()
+    print("New game!")
+
+    for timestep in count():
+        print(f"Round: {env.num_rounds}")
+        reward, state, is_done = env.get_state()
+        valid_actions = env.get_actions()
+
+        if env.active_player == AI:
+            with torch.no_grad():
+                    out = policy_net(torch.FloatTensor([state]).to(device))
+                    valid_out = out[:,np.array(valid_actions)]
+                    idx = (out==max(valid_out[0])).nonzero(as_tuple=True)[1]
+                    action = int(idx.to(device))
+                    env.do_action(action)
+                    print(f"AI action: {leduc.Actions(action)}")
+        else:
+            action_completed = False
+            print(valid_actions)
+            while not action_completed:
+                try:
+                    action = int(input("Select action: "))
+                    action_completed = True
+                except ValueError:
+                    print("Please enter an integer")
+            env.do_action(action)        
             
         if is_done:
             wallet += reward

@@ -25,10 +25,10 @@ class Ranks(Enum):
     Ace   = 14
 
 class Actions(Enum):
-    Check = 0
-    Call  = 1
-    Raise = 2
-    Fold  = 3
+    Check = 1
+    Call  = 2
+    Raise = 3
+    Fold  = 4
 
 class PokerHand(Enum):
     HighestCard = 0
@@ -64,7 +64,7 @@ class Card:
 
 class Deck:
     def __init__(self, shuffle_cards = True):
-        self.cards = [Card(Suits(x), Ranks(y), y-11+x*3) for y in range(11,14) for x in range(2)]
+        self.cards = [Card(Suits(x), Ranks(y), y-10+x*3) for y in range(11,14) for x in range(2)]
         if shuffle_cards:
             random.shuffle(self.cards)
     
@@ -72,7 +72,7 @@ class Deck:
         return self.cards.pop()
 
 class Player:
-    def __init__(self, name, wallet, is_algo = False):
+    def __init__(self, name, wallet):
         self.name = name
         self.card = None
         self.wallet = wallet
@@ -80,7 +80,6 @@ class Player:
         self.in_game = True
         self.is_all_in = False
         self.role = Roles.Player
-        self.is_algo = is_algo
     
     def show_cards(self):
         return [str(card) for card in self.hand.cards]
@@ -91,12 +90,12 @@ class Round:
         self.bet_to_call = bet_to_call
         self.is_done = False
         self.num_actions = 0
-        self.last_action = None
+        self.last_action = 0
         self.num_raises = 0
 
 class Game:
-    def __init__(self, players):
-        self.deck = Deck()
+    def __init__(self, deck, players):
+        self.deck = deck
         self.players = players
         self.active_player = None
         self.small_blind = 1
@@ -107,6 +106,20 @@ class Game:
         self.pot = self.small_blind + self.big_blind
         self.winners = []
         self.num_rounds = 0
+
+        for player in self.players:
+            if player.role == Roles.SmallBlind:
+                if player.wallet >= self.small_blind:
+                    player.wallet -= self.small_blind
+                    player.bet = self.small_blind
+                else:
+                    print("Error, wallet size is to samll for small blind")
+            elif player.role == Roles.BigBlind:
+                if player.wallet >= self.big_blind:
+                    player.wallet -= self.big_blind
+                    player.bet = self.big_blind
+                else:
+                    print("Error, wallet size is to samll for big blind")
 
     def get_actions(self):
         actions = []
@@ -136,43 +149,16 @@ class Game:
         self.num_rounds += 1
         self.round = Round(bet_to_call)
     
-    def reset(self):
-        self.deck = Deck()
-        self.active_player = None
-        self.community_card = 0
-        self.is_done = False
-        self.is_pre_flop = True
-        self.pot = self.small_blind + self.big_blind
-        self.winners = []
-        self.num_rounds = 0
-
-        for player in self.players:
-            player.wallet = 10
-        
-        for player in self.players:
-            if player.role == Roles.SmallBlind:
-                if player.wallet >= self.small_blind:
-                    player.wallet -= self.small_blind
-                    player.bet = self.small_blind
-                else:
-                    print("Error, wallet size is to samll for small blind")
-            elif player.role == Roles.BigBlind:
-                if player.wallet >= self.big_blind:
-                    player.wallet -= self.big_blind
-                    player.bet = self.big_blind
-                else:
-                    print("Error, wallet size is to samll for big blind")
-
-        self.deal_cards(1)
-
+    def start(self):
         self.new_round(1)
         if random.randint(0, 1):
             self.active_player = self.players[1]
+            if self.players[1].card.rank.value < Ranks.King.value:
+                self.do_action(Actions.Check.value)
+            else:
+                self.do_action(Actions.Raise.value)
         else:
             self.active_player = self.players[0]
-
-        if self.active_player.is_algo:
-                self.do_algo_action()
     
     def do_action(self, action):
         valid_actions = self.get_actions()
@@ -225,7 +211,7 @@ class Game:
 
         self.active_player = [player for player in self.players if player != self.active_player][0]
 
-        if self.active_player.is_algo and not self.is_done:
+        if self.active_player == self.players[1] and not self.is_done:
             self.do_algo_action()
     
     def do_algo_action(self):
@@ -299,21 +285,14 @@ class Game:
             self.winners[1].wallet += self.pot/2
         else:
             self.winners[0].wallet += self.pot
-            # if self.pot>8 and self.winners[0].name != "Bob":
-            #     print(f"pot: {self.pot}")
-            #     print(f'{self.winners[0].name} has won! {self.winners[0].wallet}')
+            #print(f'{self.winners[0].name} has won! {self.winners[0].wallet}')
     
     def get_state(self):
         reward = 0
+        community_card = 0
+        if self.community_card:
+            community_card = self.community_card.id
         if self.is_done:
             reward = self.players[0].wallet - 10
         
-        state = [0]*16
-        state[self.players[0].card.id] = 1
-        if self.community_card:
-            state[self.community_card.id+6] = 1
-        if self.round.last_action:
-            state[self.round.last_action+12] = 1
-
-
-        return reward, state, self.is_done
+        return reward, [self.players[0].card.id, community_card, self.round.last_action], self.is_done
