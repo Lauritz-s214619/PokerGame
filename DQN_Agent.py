@@ -245,6 +245,10 @@ if train:
             
         if episode % target_update == 0:
             target_net.load_state_dict(policy_net.state_dict())
+    
+    #Save models
+    torch.save(policy_net.state_dict(), './models/policy_net.pt')
+    torch.save(target_net.state_dict(), './models/target_net.pt')
 
 
 
@@ -281,9 +285,6 @@ print(f"Test end wallet: {wallet}")
 print(f"Won: {wallet-num_test_episodes*10}")
 print(f"Win sizes: {win_size}")
 print(f"Loss sizes: {loss_size}")
-
-torch.save(policy_net.state_dict(), './models/policy_net.pt')
-torch.save(target_net.state_dict(), './models/target_net.pt')
 
 
 
