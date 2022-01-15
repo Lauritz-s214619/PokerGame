@@ -115,7 +115,7 @@ class Game:
         self.num_rounds = 0
         self.verbose = verbose
         self.turn = 0
-        self.all_actions = [0]*65
+        self.all_actions = [0]*64
         
 
     def get_actions(self):
@@ -337,13 +337,11 @@ class Game:
         reward = 0
         if self.is_done:
             reward = self.players[0].wallet - 10
-        state = [0]*77
+        state = [0]*76
         state[self.players[0].card.id] = 1
         if self.community_card:
             state[self.community_card.id+6] = 1
-            
-        if self.round.last_action == None:
-            self.round.last_action = -1
+
 
         # print('A')
         # print(f'last round action{self.round.last_action}')
@@ -353,15 +351,15 @@ class Game:
         # print(f'kort {self.players[0].card} {self.players[0].card.id}')
         # print(state)
 
-        if self.active_player == self.players[0]:
-            self.all_actions[(1 + self.round.last_action + 2*self.turn + 16 * (self.num_rounds-1) + 33)] = 1
+        if self.round.last_action and self.active_player == self.players[0]:
+            self.all_actions[(self.round.last_action + 2*self.turn + 16 * (self.num_rounds-1) + 32)] = 1
             state = [0]*12 + self.all_actions
             state[self.players[0].card.id] = 1
             # print('B')
             # print(f'last round action{self.round.last_action}')
             # print(f'tur{self.turn}')
             # print(f'runde{self.num_rounds}')
-            # print(f'communit card{self.community_card}')
+            # print(f'communit card{self.community_card}')zzzz
             # print(f'kort {self.players[0].card} {self.players[0].card.id}')
             # print(state)
             if self.community_card:
@@ -373,8 +371,8 @@ class Game:
                 # print(f'communit card{self.community_card}')
                 # print(f'kort {self.players[0].card} {self.players[0].card.id}')
                 # print(state)
-        elif self.active_player == self.players[1]:
-            self.all_actions[(1+ self.round.last_action + 2*self.turn + 16 * (self.num_rounds-1))] = 1
+        elif self.round.last_action and self.active_player == self.players[1]:
+            self.all_actions[( self.round.last_action + 2*self.turn + 16 * (self.num_rounds-1))] = 1
             state = [0]*12 + self.all_actions
             state[self.players[0].card.id] = 1
             # print('D')

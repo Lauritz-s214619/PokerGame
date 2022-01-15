@@ -9,7 +9,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from itertools import count
-from leduc_min import *
+from leduc_min_historie import *
 import os
 
 
@@ -41,9 +41,9 @@ class DQN(nn.Module):
         #Basic totalforbundet netværk (Hvad)
         #Input features = 2 hand, 5 community, wallet og bet. 
         super().__init__()
-        self.fc1 = nn.Linear(in_features=77, out_features=144).to(device)
-        self.fc2 = nn.Linear(in_features=144, out_features=12).to(device)
-        self.out = nn.Linear(in_features=12, out_features=4).to(device)
+        self.fc1 = nn.Linear(in_features=76, out_features=32).to(device)
+        self.fc2 = nn.Linear(in_features=32, out_features=32).to(device)
+        self.out = nn.Linear(in_features=32, out_features=4).to(device)
     
     
     # t bliver kørt igennem netværket, med ReLU aktiveringsfunktion
@@ -169,7 +169,7 @@ batch_size = 32
 gamma = 0.99    
 eps_start = 1  
 eps_end = 0.1      
-eps_decay = 0.0003
+eps_decay = 0.0005
 eps_steps = 10000
 target_update = 1000
 memory_size = 20000
