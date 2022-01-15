@@ -41,8 +41,8 @@ class DQN(nn.Module):
         #Basic totalforbundet netværk (Hvad)
         #Input features = 2 hand, 5 community, wallet og bet. 
         super().__init__()
-        self.fc1 = nn.Linear(in_features=76, out_features=32).to(device)
-        self.fc2 = nn.Linear(in_features=32, out_features=32).to(device)
+        self.fc1 = nn.Linear(in_features=76, out_features=132).to(device)
+        self.fc2 = nn.Linear(in_features=132, out_features=32).to(device)
         self.out = nn.Linear(in_features=32, out_features=4).to(device)
     
     
