@@ -108,7 +108,7 @@ if train:
         for timestep in count():
             valid_actions = env.get_actions()
             if env.active_player == random_agent:
-                env.do_action(random.choice(valid_actions))
+                env.do_action(random.choice([action for action in valid_actions if action != 3]))
                 reward, next_state, is_done = env.get_state()
             else:
                 action = agent.select_action(torch.FloatTensor([state]).to(device), policy_net, valid_actions)
