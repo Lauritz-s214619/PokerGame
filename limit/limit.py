@@ -434,7 +434,7 @@ def pretty_card(card):
         rank = 'Q'
     elif rank == 13:
         rank = 'K'
-    elif rank == 1:
+    elif rank == 14:
         rank = 'A'
     
     return f'{suit}{rank}'
