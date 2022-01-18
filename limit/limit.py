@@ -9,7 +9,6 @@ class Suits(Enum):
     Diamonds = 3
 
 class Ranks(Enum):
-    Ace   = 1
     Two   = 2
     Three = 3
     Four  = 4
@@ -22,6 +21,7 @@ class Ranks(Enum):
     Jack  = 11
     Queen = 12
     King  = 13
+    Ace   = 14
 
 class Actions(Enum):
     Check = 0
@@ -63,7 +63,7 @@ class Card:
 
 class Deck:
     def __init__(self, shuffle_cards = True):
-        self.cards = [Card(Suits(x), Ranks(y), y-1+x*13) for y in range(1,14) for x in range(4)]
+        self.cards = [Card(Suits(x), Ranks(y), y-1+x*13) for y in range(2,15) for x in range(4)]
         #print([card.id for card in self.cards])
         if shuffle_cards:
             random.shuffle(self.cards)
@@ -306,7 +306,7 @@ class Game:
                 unique_ranks.sort()
                 straight_rank = False
                 for rank in unique_ranks:
-                    if last_rank + 1 == rank:
+                    if last_rank + 1 == rank or (last_rank == 14 and rank == 2):
                         straight_count += 1
                         if straight_count >= 5:
                             straight_rank = rank
