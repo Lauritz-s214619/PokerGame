@@ -47,6 +47,7 @@ for _ in range(num_games):
         num_wins += 1
     elif reward<0:
         num_loss += 1
+    print(f"Reward: {reward}")
 
 print(f"Played {num_games} games")
 print(f"Won {num_wins} times")
