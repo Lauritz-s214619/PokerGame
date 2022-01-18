@@ -31,6 +31,7 @@ env = Game([player, random_agent], verbose=False)
 num_test_episodes = 10000
 wallet = num_test_episodes*50
 num_test_wins = 0
+num_test_loss = 0
 for episode in range(num_test_episodes):
     env.reset()
 
@@ -49,16 +50,22 @@ for episode in range(num_test_episodes):
             
         if is_done:
             wallet += reward
-            if reward>=0:
+            if reward>0:
                 num_test_wins += 1
+            elif reward<0:
+                num_test_loss += 1
             break
 
+print(f"Played {num_test_episodes} games")
+
+print(f"Won {num_test_wins} times")
+print(f"Loss {num_test_loss} times")
+print(f"Tie {num_test_episodes - (num_test_wins+num_test_loss)} times")
 print(f"Test win rate: {(num_test_wins / num_test_episodes)*100:.2F}%")
 print(f"Test start wallet: {num_test_episodes*50}")
 print(f"Test end wallet: {wallet}")
 print(f"Won: {wallet-num_test_episodes*50}")
 print(f"Average reward: {(wallet-num_test_episodes*50)/num_test_episodes}")
-input("Press any button to close the plot...")
 
 
 
