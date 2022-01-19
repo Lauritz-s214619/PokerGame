@@ -119,11 +119,10 @@ class Game:
         self.winners = []
         self.round_num = 0
         self.verbose = verbose
-        #self.raise_history = [1,0,0,1,0,0]
 
     def get_actions(self):
         actions = []
-        if self.active_player.bet == self.round.bet_to_call:
+        if self.active_player.bet >= self.round.bet_to_call: #Go back to == if bugs
             actions.append(Actions.Check)
             actions.append(Actions.Raise)
         elif self.active_player.bet < self.round.bet_to_call:
@@ -162,7 +161,6 @@ class Game:
         self.pot = self.small_blind + self.big_blind
         self.winners = []
         self.round_num = 0
-        #self.raise_history = [1,0,0,1,0,0]
 
         for player in self.players:
             player.wallet = 50
@@ -228,8 +226,6 @@ class Game:
                 self.active_player.bet += bet
                 self.pot += bet
                 self.round.last_action = Actions.Raise.value
-                #self.raise_history[3*(self.round_num-1):3*self.round_num] = [0]*3
-                #self.raise_history[self.round.num_raises+3*(self.round_num-1)] = 1
 
             elif action == Actions.Fold.value:
                 self.is_done = True
@@ -400,7 +396,6 @@ class Game:
                 state[card.id+52] = 1
         if self.round.last_action is not None:
             state[self.round.last_action+104] = 1
-        #state[12:] = self.raise_history
 
 
         return reward, state, self.is_done

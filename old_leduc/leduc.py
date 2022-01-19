@@ -97,6 +97,7 @@ class Round:
         self.bet_to_call = bet_to_call
         self.is_done = False
         self.num_actions = 0
+        self.last_action = None
         self.num_raises = 0
 
 class Game:
@@ -113,16 +114,11 @@ class Game:
         self.winners = []
         self.num_rounds = 0
         self.verbose = verbose
+        #self.raise_history = [1,0,0,1,0,0]
         self.last_action = None
 
     def get_actions(self):
         actions = []
-        # print("-- START --")
-        # print(self.active_player.name)
-        # print(self.active_player.bet)
-        # print(self.round.bet_to_call)
-        # print(self.round.num_raises)
-        # print("-- END --")
         if self.active_player.bet >= self.round.bet_to_call:
             actions.append(Actions.Check)
             actions.append(Actions.Raise)
@@ -131,6 +127,7 @@ class Game:
             if (self.active_player.wallet + self.active_player.bet) > self.round.bet_to_call and self.round.num_raises < 2:
                 actions.append(Actions.Raise)
             actions.append(Actions.Fold)
+        print([action.value for action in actions])
         return [action.value for action in actions]
 
     
@@ -162,20 +159,10 @@ class Game:
         self.pot = self.small_blind + self.big_blind
         self.winners = []
         self.num_rounds = 0
-        self.last_action = None
+        #self.raise_history = [1,0,0,1,0,0]
 
         for player in self.players:
             player.wallet = 10
-
-        self.new_round(self.big_blind)
-        if random.randint(0, 1):
-            self.active_player = self.players[1]
-            self.players[0].role = Roles.SmallBlind
-            self.players[1].role = Roles.BigBlind
-        else:
-            self.active_player = self.players[0]
-            self.players[0].role = Roles.BigBlind
-            self.players[1].role = Roles.SmallBlind
         
         for player in self.players:
             if player.role == Roles.SmallBlind:
@@ -192,6 +179,12 @@ class Game:
                     print("Error, wallet size is to samll for big blind")
 
         self.deal_cards(1)
+
+        self.new_round(1)
+        if random.randint(0, 1):
+            self.active_player = self.players[1]
+        else:
+            self.active_player = self.players[0]
 
         if self.verbose:
             self.print_info()
@@ -222,6 +215,8 @@ class Game:
                 self.active_player.bet += bet
                 self.pot += bet
                 self.last_action = Actions.Raise.value
+                #self.raise_history[3*(self.num_rounds-1):3*self.num_rounds] = [0]*3
+                #self.raise_history[self.round.num_raises+3*(self.num_rounds-1)] = 1
 
             elif action == Actions.Fold.value:
                 self.is_done = True
@@ -341,12 +336,15 @@ class Game:
         if self.is_done:
             reward = self.players[0].wallet - 10
         
-        state = [0]*16
+        state = [0]*16 #[0]*18 # 0-5, player card, 6-11 community card, 12-14 num raises in round 1, 15-17 num raises in round 2
         state[self.players[0].card.id] = 1
         if self.community_card:
             state[self.community_card.id+6] = 1
         if self.last_action is not None:
+            #print("HERE")
+            #print(self.last_action)
             state[self.last_action+12] = 1
+        #state[12:] = self.raise_history
 
 
         return reward, state, self.is_done

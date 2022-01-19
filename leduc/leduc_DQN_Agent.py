@@ -10,7 +10,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from itertools import count
-from limit import *
+from leduc import *
 import os
 
 device = torch.device("cpu" if torch.cuda.is_available() else "cpu")
@@ -36,9 +36,9 @@ class DQN(nn.Module):
         #Basic totalforbundet netværk (Hvad)
         #Input features = 2 hand, 5 community, wallet og bet. 
         super().__init__()
-        self.fc1 = nn.Linear(in_features=108, out_features=256).to(device)
-        self.fc2 = nn.Linear(in_features=256, out_features=256).to(device)
-        self.out = nn.Linear(in_features=256, out_features=4).to(device)
+        self.fc1 = nn.Linear(in_features=16, out_features=32).to(device)
+        self.fc2 = nn.Linear(in_features=32, out_features=32).to(device)
+        self.out = nn.Linear(in_features=32, out_features=4).to(device)
     
     
     # t bliver kørt igennem netværket, med ReLU aktiveringsfunktion
@@ -115,3 +115,43 @@ class Agent():
                 valid_out = out[:,np.array(valid_actions)]
                 idx = (out==max(valid_out[0])).nonzero(as_tuple=True)[1]
                 return idx.to(self.device) # exploit
+
+
+
+# #Test
+# num_test_episodes = 10000
+# wallet = num_test_episodes*10
+# num_test_wins = 0
+# win_size = np.zeros((11))
+# loss_size = np.zeros((10))
+# for episode in range(num_test_episodes):
+#     env.reset()
+
+#     for timestep in count():
+#         reward, state, is_done = env.get_state()
+#         valid_actions = env.get_actions()
+#         with torch.no_grad():
+#                 out = policy_net(torch.FloatTensor([state]).to(device))
+#                 valid_out = out[:,np.array(valid_actions)]
+#                 idx = (out==max(valid_out[0])).nonzero(as_tuple=True)[1]
+#                 env.do_action(int(idx.to(device)))
+            
+#         if is_done:
+#             wallet += reward
+#             if reward>=0:
+#                 num_test_wins += 1
+#                 win_size[int(reward)] += 1
+#             else:
+#                 loss_size[abs(int(reward))-1] += 1
+#             break
+
+# print(f"Test win rate: {(num_test_wins / num_test_episodes)*100:.2F}%")
+# print(f"Test start wallet: {num_test_episodes*10}")
+# print(f"Test end wallet: {wallet}")
+# print(f"Won: {wallet-num_test_episodes*10}")
+# print(f"Win sizes: {win_size}")
+# print(f"Loss sizes: {loss_size}")
+# input("Press any button to close the plot...")
+
+
+
