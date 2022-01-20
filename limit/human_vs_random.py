@@ -1,7 +1,6 @@
 import numpy as np
 import random
 from limit import *
-from DQN_Agent import DQN
 
 random_agent = Player("Rob Random", 50, show_card=False)
 player = Player("Human", 50)
