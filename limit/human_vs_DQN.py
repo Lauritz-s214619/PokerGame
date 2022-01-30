@@ -9,6 +9,7 @@ policy_net_path = './models/policy_net.pt'
 
 policy_net = DQN()
 if os.path.exists(policy_net_path):
+    print("Loading pretrained model")
     policy_net.load_state_dict(torch.load(policy_net_path))
     policy_net.eval()
 

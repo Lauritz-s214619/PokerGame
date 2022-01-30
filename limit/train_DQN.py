@@ -25,7 +25,7 @@ def plot(values, period):
     plt.title(f'Training, Eps: {agent.eps}')
     plt.xlabel('Episode')
     plt.ylabel('Reward')
-    plt.ylim(-3,3)
+    plt.ylim(-5,5)
     #plt.plot(values)
     avg_reward = get_avg_reward(period, values)
     plt.plot(avg_reward)  
@@ -64,12 +64,12 @@ batch_size = 32
 gamma = 0.99    
 eps_start = 1  
 eps_end = 0.1      
-eps_decay = 0.0002
+eps_decay = 0.00004
 eps_steps = 10000
 target_update = 1000
 memory_size = 10000
 lr = 0.00005
-num_episodes = 20000
+num_episodes = 50000
 
 ##Main Program
 
@@ -100,7 +100,11 @@ for episode in range(num_episodes):
     for timestep in count():
         valid_actions = env.get_actions()
         if env.active_player == random_agent:
-            env.do_action(random.choice([action for action in valid_actions if action != 3]))
+            if 2 in valid_actions:
+                env.do_action(2) #Raise
+            else:
+                env.do_action(1) #Call
+            #env.do_action(random.choice([action for action in valid_actions if action != 3]))
             reward, next_state, is_done = env.get_state()
         else:
             action = agent.select_action(torch.FloatTensor([state]).to(device), policy_net, valid_actions)

@@ -62,12 +62,12 @@ batch_size = 32
 gamma = 0.99    
 eps_start = 1  
 eps_end = 0.1      
-eps_decay = 0.0005
+eps_decay = 0.0002
 eps_steps = 10000
 target_update = 1000
 memory_size = 10000
 lr = 0.00005
-num_episodes = 10000
+num_episodes = 20000
 
 ##Main Program
 
@@ -102,8 +102,6 @@ for episode in range(num_episodes):
         env.do_action(int(action))
         reward, next_state, is_done = env.get_state()
         new_valid_actions = env.get_actions()
-        #reward = -reward
-        #reward = reward**3
         memory.push(Experience(torch.FloatTensor([state]).to(device), torch.LongTensor([action]).to(device), torch.FloatTensor([next_state]).to(device), torch.FloatTensor([reward]).to(device), torch.FloatTensor([new_valid_actions]).to(device)))
         state = next_state
         

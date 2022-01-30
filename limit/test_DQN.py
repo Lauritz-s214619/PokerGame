@@ -33,6 +33,7 @@ num_test_episodes = 10000
 wallet = num_test_episodes*50
 num_test_wins = 0
 num_test_loss = 0
+num_actions = [0]*4
 rewards = []
 for episode in range(num_test_episodes):
     env.reset()
@@ -41,6 +42,10 @@ for episode in range(num_test_episodes):
         reward, state, is_done = env.get_state()
         valid_actions = env.get_actions()
         if env.active_player == random_agent:
+            # if 2 in valid_actions:
+            #     env.do_action(2)
+            # else:
+            #     env.do_action(1)
             env.do_action(random.choice([action for action in valid_actions if action != 3]))
             reward, next_state, is_done = env.get_state()
         else:
@@ -48,7 +53,9 @@ for episode in range(num_test_episodes):
                     out = policy_net(torch.FloatTensor([state]).to(device))
                     valid_out = out[:,np.array(valid_actions)]
                     idx = (out==max(valid_out[0])).nonzero(as_tuple=True)[1]
-                    env.do_action(int(idx.to(device)))
+                    action = int(idx.to(device))
+                    env.do_action(action)
+                    num_actions[action] += 1
             
         if is_done:
             wallet += reward
@@ -58,6 +65,8 @@ for episode in range(num_test_episodes):
             elif reward<0:
                 num_test_loss += 1
             break
+    if episode % 1000 == 0:
+        print(f'episode: {episode} win/loss diff: {num_test_wins-num_test_loss}')
 
 print(f"Played {num_test_episodes} games")
 
@@ -72,6 +81,11 @@ print(f"Average reward: {(wallet-num_test_episodes*50)/num_test_episodes}")
 
 
 print(f"Std: {np.std(rewards)}")
+
+print(f"Number of checks: {num_actions[0]}")
+print(f"Number of calls: {num_actions[1]}")
+print(f"Number of raises: {num_actions[2]}")
+print(f"Number of folds: {num_actions[3]}")
 
 
 

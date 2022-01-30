@@ -106,12 +106,11 @@ class Agent():
         self.current_step += 1
 
         if rate > random.random():
-            action = random.choice(valid_actions)
-            return torch.tensor([action]).to(self.device)   #  explore
+            return random.choice(valid_actions)   #  explore
         else:
             # no_grad da vi ikke vil opdatere gradienten til NN
             with torch.no_grad():
                 out = policy_net(state)
                 valid_out = out[:,np.array(valid_actions)]
                 idx = (out==max(valid_out[0])).nonzero(as_tuple=True)[1]
-                return idx.to(self.device) # exploit
+                return idx.item() # exploit
